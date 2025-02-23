@@ -18,7 +18,7 @@ function Editor() {
 
   useEffect(() => {
     socket.on("updateContent", (updatedContent) => {
-      console.log("update Content got");
+      quilRef.current.setText(updatedContent);
       setContent(updatedContent);
     });
     return () => {
@@ -29,8 +29,10 @@ function Editor() {
   //   - Handle local changes
   //   - Broadcast changes to other users
   //   - Apply remote changes
-  const sendMessageToServer = () => {
+  const sendMessageToServer = (delta) => {
+    console.log("text has changed", delta.ops);
     const updated = quilRef.current.getText();
+
     setContent(updated);
     socket.emit("edit", updated);
   };
@@ -38,33 +40,35 @@ function Editor() {
   //   - Handle connection loss
   //   - Implement change recovery
   //   - Add conflict resolution
-  useLayoutEffect(function () {
-    function addEditor() {
-      try {
-        if (!containerRef.current)
-          throw new Error("Editor container not found!");
-        const quill = new Quill(containerRef.current, {
-          theme: "snow",
-          placeholder: "Start writing...",
-        });
-        quilRef.current = quill;
+  useLayoutEffect(
+    function () {
+      function addEditor() {
+        try {
+          if (!containerRef.current)
+            throw new Error("Editor container not found!");
+          const quill = new Quill(containerRef.current, {
+            theme: "snow",
+            placeholder: "Start writing...",
+          });
+          quilRef.current = quill;
 
-        quill.on("text-change", () => {
-          sendMessageToServer();
-        });
-      } catch (err) {
-        console.log(err);
+          quill.on("text-change", (delta, oldDelta, source) => {
+            if (source === "api") console.log("calling from api");
+            if (source === "user") sendMessageToServer(delta);
+          });
+        } catch (err) {
+          console.log(err);
+        }
       }
-    }
-    addEditor();
-    return () => {
-      containerRef.current = null;
-    };
-  }, []);
+      addEditor();
+      return () => {
+        containerRef.current = null;
+      };
+    },
+    [containerRef]
+  );
   return (
     <div>
-      <Cursor name="atris:p"></Cursor>
-
       <div ref={containerRef}></div>
       <p>{content}</p>
     </div>
